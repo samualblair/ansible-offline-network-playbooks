@@ -1,0 +1,132 @@
+= Offline network Ansible Playbooks
+
+Ansible playbooks that are mostly portable to be run on live network equipment
+
+. <<Description>>
+. <<Directions on use>>
+. <<Environment Requirements>>
+. <<Key Operations>>
+.. <<General playbook operations for Generating Configuration(s)>>
+.. <<Playbooks for Generating Configuration(s) based on CSV variables>>
+... <<Playbook for generation of L2 Switch Configuration (IOS-XE)>>
+*** <<Alternative Example for generation of L2 Switch Configuration (IOS-XE) - Stacked>>
+*** <<Alternative Example for generation of L2 Switch Configuration (IOS-XE) - Chassis>>
+... <<Playbook for generation of L2/L3 Switch/Router Configuration (IOS-XE)>>
+... <<Playbook for generation of L3 Router Configuration (IOS-XE)>>
+... <<Playbook for generation of L2/L3 Switch/Router Configuration (NX-OS)>>
+. <<Future TO-DO Goals>>
+
+== Description
+
+This is a collection of Playbooks with associated templates, config files, variable examples, that can be used fully off-line to assist with generating/operating network devices with a goal to help automate consistant configurations or configuration snips based on templates and variables.
+
+GitHub Link: https://github.com/samualblair/ansible-offline-network-playbooks
+
+For those in need of operational status checks, live device configuration push/pull, and other on-line tasks see similar repository (running requires execution while online due to device connectivity requirements).
+
+GitHub Link: https://github.com/samualblair/ansible-live-network-playbooks
+
+This repository includes playbooks designed to be mostly portable and require minimal touch/configuration on network equipment. The original intenet was for an engineer to be able to use in medium to large enviornment that the engineer may have access rights but not neccisarly have ownership or long-term mainteance over. This collection specifically goes even further by not requiring access to any live devices, allowing an outside resource, someone without network access or offsite without direct VPN access, to effictivly work with configurations that can later be loaded onto devices.
+
+NOTE: The minumum requirement to customize these playbooks is either modification of the ansible hosts file (if relevent) or modification of the CSV file (mostly used). In addition it is very likely that base templates will need to be modified to suit the needs of the enviornment. Additional template modification may be required to build more complicated configurations.
+
+The primary benifits are currently the ability to generate configuatioins, adjust a variable and regenerate configurations. In addition most configuration files output are idempotent so it is easier to observe if files have changed wehen regenerating. All of this is intended to be done offline, removing any network requirements and allowing an engineer to get started as soon as possible (as soon as variables and requirements are understood).
+
+This selection of playbooks perform different configuration generation actions, such as generating L2 access configurations for a Cisco catalyst switch, L3 Core configurations for a Cisco Catalyst switch, L2/L3 configurations for a Cisco IOS-XE Router.
+
+
+== Directions on use
+
+Thes playbooks are designed to be all offline the only risk is overwriting a previously generated config (which you can back-up first if you wish). Feel free to get started quickly and move fast testing and learning. Use common sense for reviewing prior to sending/applying to any devices.
+
+NOTE: These are off-line playbooks, many are idempotent and running them multiple times will result in the same output. Some operations may not be considered idempotent and may show a 'Changed' status in ansible output even if no change on device was made. This may be expected and can be understood by reviewing what the playbook is refereing to as 'Changed'.
+
+* Ensure ansible execution enviornment is ready (see Environment Requirements)
+* Copy/Clone Repository
+* Customize the repository
+** Initial customization should include modification of ansible hosts file or CSV, some playbooks only pull from one and not the other. Some may pull from both.
+** Expect adjustments to be required to base configuration template
+* Run ansible playbooks
+* Review output files and use as needed
+
+== Environment Requirements
+
+NOTE: This is expected to perform offline generation of configurations.
+
+
+Execution enviornment Requirements:
+Should be able to install most sub-dependancies via PIP, PIP3, PIPX, or ansible-galaxy
+
+* Python
+** Ansible
+*** network_cli
+** Jinja2
+
+
+
+== Key Operations
+
+These scripts (playbooks) can be run by executing the Ansible Playbook when ready, your local enviornemnt (system) will generate and store files locally. 
+
+Detailed operations of these Ansible Playbooks:
+
+### General playbook operations for Generating Configuration(s)
+Can be executed by running "ansible-playbook pb.generate_config_from_csv.yml".
+
+  WARNING: An assumption is made that all password/secret variables will be entered/stored encrypted or protected in some way (examples are random data). Any adjustment to include raw (unprotected) data should be done with security considerations. At the very least you should never run or store such data/output files, on unencrypted disks.
+
+* Playbook pb.generate_config_from_csv.yml
+* A CSV file is created/updated with site-specific details
+** The CSV File is named 'device_variables.csv'
+** The CSV file will need to be filled with infomation about the specific site
+** An example CSV file is provided
+
+* Ansible will use a Jinja2 template to convert the CSV into YAML based Variables files
+** This is done by referencing the 'variable-template.j2' file and using the csv file split /n
+** Modifications should not be neccisary to this file unless you are attempting to add more variables (if adding coulmns to CSV and variables to the config file)
+** This file calls out coulmns in the CSV starting with 0 (which would be coulmn A in excel)
+*** The YAML file created will be removed when the ansible playbook is done, if you would like to troubleshoot/view then comment out the removal in the ansible playbook
+*** Many variables are just mapped 1:1 in the YAML file
+*** The VLAN variables are looped through and added to a list in the YAML file
+* Ansible creates a Directory for configuration ouput files (in case directory does not exist)
+* Ansible uses a Jinja2 template to generate the configuration file for each access switch
+** This is primarily done by referencing the 'config_template.j2' file , output config files will be located in device_configs folder with 'hostname' as name with .cfg extension
+*** Additional Jinja2 templates can be brought into this first template
+*** To avoid unneccisary complexity these other templates should generally be snippits of configuration that can be brought in to this file but also easily re-used elsewhere
+** Ansible will take in variables (which were generated from the CSV, and at this time are located in a temp file in YAML format)
+** The variables will be used to fill out this template and output configuration files, one per hostname
+
+NOTE: Normal use requires adjustment of CSV file and 'config_template.j2' file. Additional template files may need to be adjusted (code snippits, if used). Device specific variables are adjustable by updating the CSV file (for all devices). Site wide variables are adjustable by updating the base 'config_template.j2' file directly, this also includes any general updates to configration styles/standards
+
+## Playbooks for Generating Configuration(s) based on CSV variables
+All of the following playbooks will generate configuration files based on variables found in CSV files and base/other Jinja2 templates. Legacy method was creating multiple playbooks, templates, one for each device type/function. New method is one playbook, with more embeded Jinja2 templates breaking out each device type/function.
+
+### Playbook for generation of L2 Switch Configuration (IOS-XE)
+Pending
+
+### Alternative Example for generation of L2 Switch Configuration (IOS-XE) - Stacked
+Pending
+
+### Alternative Example for generation of L2 Switch Configuration (IOS-XE) - Chassis
+Pending
+
+### Playbook for generation of L2/L3 Switch/Router Configuration (IOS-XE)
+Pending
+
+### Playbook for generation of L3 Router Configuration (IOS-XE)
+Pending
+
+### Playbook for generation of L2/L3 Switch/Router Configuration (NX-OS)
+Pending
+
+
+== Future TO-DO Goals
+
+Continue to improve documentation.
+
+Add more variables
+** add more variables to account for regional AAA settings
+** add more variables to account for other flexible configurations
+
+Add additional playbooks, or adjust to use seperate sub-jinja2 'base' templates per device/function category
+

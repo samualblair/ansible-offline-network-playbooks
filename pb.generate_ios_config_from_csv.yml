@@ -1,0 +1,54 @@
+---
+- name: Create .cfg files for IOS devices from CSV
+  hosts: localhost
+  gather_facts: false
+  connection: local
+
+  vars:
+    csvfile: "{{ lookup('file', './vars/device_variables.csv') }}"
+
+  tasks:
+
+    - name: Create Directory for temp files
+      ansible.builtin.file:
+        path: ./tmp
+        state: directory
+        # Set permissions using octal so leading 0 , set to User=RW , Group=R , Other=R
+        mode: 0755
+
+    - name: Parse CSV To YAML
+      ansible.builtin.template:
+        src: "./templates/variable-template.j2"
+        dest: "./tmp/config_variables.yml"
+        # Set permissions using octal so leading 0 , set to User=RW , Group=R , Other=R
+        mode: 0644
+      run_once: true
+
+    - name: Include config variables yaml
+      ansible.builtin.include_vars: ./tmp/config_variables.yml
+
+    - name: Create Directory for configurations
+      ansible.builtin.file:
+        path: ./device_configs
+        state: directory
+        # Set permissions using octal so leading 0 , set to User=RW , Group=R , Other=R
+        mode: 0755
+
+    - name: Generate Device Configurations
+      ansible.builtin.template:
+        src: "./templates/config_template.j2"
+        dest: "./device_configs/{{ item.switch.hostname }}.cfg"
+        # Set permissions using octal so leading 0 , set to User=RW , Group=R , Other=R
+        mode: 0644
+      delegate_to: localhost
+      with_items: "{{ devices }}"
+
+    - name: Remove Inventory YML File (config_variables.yml) on playbook completion
+      ansible.builtin.file:
+        path: ./tmp/config_variables.yml
+        state: absent
+
+    - name: Remove Temp Folder (config_variables.yml) on playbook completion
+      ansible.builtin.file:
+        path: ./tmp
+        state: absent

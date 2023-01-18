@@ -1,0 +1,52 @@
+---
+devices:
+{% for item in csvfile.split("\n") %}
+{%   if loop.index != 1 %}
+{%     set list = item.split(",") %}
+
+  - switch: 
+      hostname: '{{ list[0]|trim()|lower }}'
+      closet_location: '{{ list[1]|trim()|upper }}'
+      serial_number: '{{ list[2]|trim()|upper }}'
+      asset_tag: '{{ list[3]|trim()|upper }}'
+      mgmt_ip: '{{ list[4]|trim() }}'
+      mgmt_vlan: '{{ list[14]|trim() }}'
+      voip_vlan: '{{ list[10]|trim() }}'
+      wlc_vlan: '{{ list[12]|trim() }}'
+      upstream_portchannel: '{{ list[5]|trim() }}'
+      upstream_uplink_int1: '{{ list[6]|trim() }}'
+      upstream_uplink_int2: '{{ list[7]|trim() }}'
+      vlans:
+        - vlan_number: '{{ list[8]|trim() }}'
+          vlan_name: '{{ list[9]|trim() }}'
+        - vlan_number: '{{ list[10]|trim() }}'
+          vlan_name: '{{ list[11]|trim() }}'
+        - vlan_number: '{{ list[12]|trim() }}'
+          vlan_name: '{{ list[13]|trim() }}'
+        - vlan_number: '{{ list[14]|trim() }}'
+          vlan_name: '{{ list[15]|trim() }}'
+
+{%   endif %}
+{% endfor %}
+
+## CSV Header Listings #Coulmn# Name
+#0# hostname,
+#1# closet_location,
+#2# serial_number,
+#3# asset_tag,
+#4# mgmt_ip,
+#5# upstream_portchannel,
+#6# upstream_uplink_int1,
+#7# upstream_uplink_int2,
+#
+#
+#8# vlan_data_number,
+#9# vlan_data_name,
+#10# vlan_voice_number,
+#11# vlan_voice_name,
+#12# vlan_wlc_number,
+#13# vlan_wlc_name,
+#14# vlan_mgmt_number,
+#15# vlan_mgmt_name
+#
+#

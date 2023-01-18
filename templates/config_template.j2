@@ -1,0 +1,426 @@
+{# Set Hostname #}
+hostname {{ item.switch.hostname }}
+
+no service pad
+service nagle
+service tcp-keepalives-in
+service tcp-keepalives-out
+service timestamps debug datetime msec localtime show-timezone
+service timestamps log datetime msec localtime show-timezone
+service password-encryption
+service compress-config
+
+username exampleusername privilege 15 secret exampleplainpassword
+username exampleusername2 privilege 15 secret 5 $1$zCuJ$tsdzZ1p2s1JE3ESotCeau1
+! access-list 40 remark Enable secret version current version date 19980125
+! enable secret hidden
+
+clock timezone CST -6
+clock summer-time CDT recurring 2 Sun Mar 02:00 1 Sun Nov 02:00 60
+
+udld enable
+errdisable recovery cause loopback
+
+port-channel load-balance src-dst-ip
+ip subnet-zero
+no ip source-route
+
+!crypto key generate rsa general-keys modulus 2048
+
+ip ssh version 2
+
+spanning-tree mode rapid-pvst
+spanning-tree loopguard default
+spanning-tree portfast default
+spanning-tree portfast bpduguard default
+spanning-tree extend system-id
+spanning-tree vlan 1-4094 priority 61440
+
+vtp mode off
+lldp run
+
+{# VLAN Configuration #}
+{% for vlan in item.switch.vlans %}
+vlan {{ vlan.vlan_number }}
+ name {{ vlan.vlan_name|upper }}
+{% endfor %}
+
+vlan 1001
+ name NATIVE_EXPLICIT_UNTAGGED
+
+{# Need MGMT VLAN MASK and Asset Tag #}
+interface Vlan150
+ description TYPE=MGMT SN={{ item.switch.serial_number }} AT={{ item.switch.asset_tag }}
+ ip address {{ item.switch.mgmt_ip }} 255.255.255.0
+ no ip redirects
+ no ip proxy-arp
+ no ipv6 redirects
+
+no ip http server
+no ip http secure-server
+
+access-list 65 remark Network Management access
+access-list 65 permit 10.0.0.0 0.255.255.255
+access-list 65 permit 172.16.0.0 0.240.255.255
+access-list 65 permit 192.168.0.0 0.0.255.255
+
+snmp ifmib ifalias long
+
+access-list 41 remark SNMPv3 version 19980125
+snmp-server view ReadView 1.3.6.1.* included
+snmp-server group ReadGroup v3 priv read ReadView
+snmp-server group ReadGroup v3 auth context vlan- match prefix
+snmp-server user readnmsuser ReadGroup v3 auth sha {{ "aaaaaaaaa1" }} priv aes 128 {{ "aaaaaaaaa1" }} access 65
+
+snmp-server community {{ "aa1|2!2$xj]" }} RO 65
+snmp-server trap-source Vlan150
+snmp-server ifindex persist
+snmp-server location 555 S 70th St Lincoln NE 68510
+
+snmp-server contact **OnSite Support** Primary On-Call **Engineering Support** Primary On-Call
+snmp-server enable traps config
+snmp-server enable traps entity
+snmp-server enable traps envmon fan shutdown supply temperature status
+snmp-server enable traps hsrp
+
+logging source-interface Vlan150
+logging trap notifications
+logging facility local0
+logging host 169.254.50.1
+logging host 169.254.50.2
+
+{# Need CON/VTY Passwords #}
+line con 0
+logging synchronous
+login local
+exec-timeout 15
+transport preferred none
+
+line vty 0 15
+login local
+exec-timeout 15
+transport preferred none
+transport input ssh
+
+access-list 90 permit host 169.254.51.123
+access-list 90 permit host 169.254.52.123
+access-list 91 permit host 169.254.51.123
+access-list 91 permit host 169.254.52.123
+
+ntp access-group peer 90
+ntp access-group serve-only 91
+ntp access-group query-only 91
+
+ntp server 169.254.51.123 version 4 prefer
+ntp server 169.254.52.123 version 4
+ntp source vlan 150
+
+no ip dhcp snooping information option
+ip dhcp snooping vlan 2-999
+no ip dhcp snooping vlan 150
+ip dhcp snooping
+
+banner motd ^
+===============================================================================
+Authorized Users Only.
+This information system is private. This information system may be accessed and
+used by authorized personnel only.
+
+Misuse of this information system may result in legal action.
+===============================================================================
+^
+
+interface Te1/1/1
+ description SW=site1-mdf-aggregation1 IP=10.1.1.12 IF={{ item.switch.upstream_uplink_int1 }}
+ switchport
+ channel-group 1 mode active
+ no shutdown
+
+interface Te2/1/1
+ description SW=site1-mdf-aggregation1 IP=10.1.1.12 IF={{ item.switch.upstream_uplink_int2 }}
+ switchport
+ channel-group 1 mode active
+ no shutdown
+
+{# LOOP to start with MGMT VLAN Only and add additional allowed #}
+interface Port-channel1
+ description TYPE=local SW=site1-mdf-aggregation1 IP=10.1.1.12 IF={{ item.switch.upstream_portchannel }}
+ switchport
+ switchport trunk allowed vlan {{ item.switch.mgmt_vlan }}
+{% for vlan in item.switch.vlans %}
+ switchport trunk allowed vlan add {{ vlan.vlan_number }}
+{% endfor %}
+ switchport trunk native vlan 1001
+ switchport mode trunk
+ spanning-tree portfast disable
+ spanning-tree bpduguard disable
+ ip dhcp snooping trust
+
+
+ip domain lookup
+ip domain name example.domain.local
+ip name-server 169.254.54.53 169.254.55.54
+ip domain lookup source-interface Vlan150
+license smart transport callhome
+ip http client source-interface Vlan150
+
+!license boot level network-advantage addon dna-advantage
+!! DH Token
+!license smart register idtoken xxxxxxxxyyyyyyyzzzzzzzTOKENHERExxxxxxyyyyyyzzzz
+!!You can verify the status by running show license all
+
+!crypto key generate rsa general-keys modulus 2048
+
+! ##########################################################################################################################
+! ##########################################################################################################################
+! Catalyst 9300 additional configuration
+! ##########################################################################################################################
+! ##########################################################################################################################
+
+no service private-config-encryption
+
+no ip routing
+
+ip default-gateway 10.1.1.1
+
+{#
+! ##########################################################################################################################
+! ##########################################################################################################################
+! Catalyst 9400 additional configuration
+! ##########################################################################################################################
+! ##########################################################################################################################
+
+no service private-config-encryption
+
+ip routing
+
+ip route 0.0.0.0 0.0.0.0 10.1.1.1
+
+! #########################################################################
+! Redundant Supervisor Chassis Switches
+! #########################################################################
+redundancy
+ mode sso
+ main-cpu
+  standby console enable
+
+! #########################################################################
+! Power Supply Configuration
+!
+! Power supplies on the 9400 chassis should be in slots 1,2,5 and 6.  Power
+! supplies 1 and 2 are primary with 5 and 6 being standby.
+!
+! #########################################################################
+power redundancy-mode redundant n+n 5 6
+#}
+
+{#
+!# set dscp value for management traffic originating from device
+!# NOTE:  setting DSCP 63 for matching in out queue, can't set qos-group
+ip ssh dscp 63
+snmp-server ip dscp 63
+
+!# match DSCP or COS - used for input
+class-map match-any L2-VOIP-Payload
+  match dscp ef
+  match cos 5
+class-map match-any L2-VOIP-Control
+  match dscp cs3
+  match cos 3
+class-map match-any L2-Video-Conference
+  match dscp af41
+  match cos 4
+class-map match-any L2-Net-Mgmt
+  match dscp cs2
+  match cos 2
+
+!# match qos-group's - used for output queues
+class-map match-any L2-VOIP-Payload-QoSGroup
+  match qos-group 24 
+class-map match-any L2-VOIP-Contol-QoSGroup
+  match qos-group 12
+class-map match-any L2-Video-Conference-QoSGroup
+  match qos-group 18
+class-map match-any L2-Net-Mgmt-QoSGroup
+  match qos-group 6
+class-map match-any L2-Net-Mgmt-Local
+  match dscp 63
+
+
+
+
+
+!# policy for links between network devices
+!#  i.e. switch to switch, switch to router, etc
+!#  TRUST: VOIP, Video, Net-Mgmt
+!#  Queues:  VOIP EF, VOIP CS3, Video, Net-Mgmt, Default
+
+!# used on port-channel member interfaces - NOTE: local net management doesn't work on PO members, can't match dscp and qos-group
+policy-map L2-Network-Out-PO-Member
+ class L2-VOIP-Payload-QoSGroup
+    priority level 1
+ class L2-VOIP-Contol-QoSGroup
+    bandwidth remaining percent 5
+ class L2-Video-Conference-QoSGroup
+    bandwidth remaining percent 10
+ class L2-Net-Mgmt-QoSGroup
+    bandwidth remaining percent 5
+ class class-default
+    
+
+policy-map L2-Network-Trust-In
+  class L2-VOIP-Payload
+    set qos-group 24
+  class L2-VOIP-Control
+    set qos-group 12
+  class L2-Video-Conference
+    set qos-group 18
+  class L2-Net-Mgmt
+    set qos-group 6
+  class class-default
+
+
+
+!# policy for links to non-network devices
+!#  i.e. end user devices, vendor network, anything not controlled by NSData
+!#  NOTE: Net-Mgmt traffic NOT trusted inbound
+!#  TRUST: VOIP, Video
+!#  Queues:  VOIP EF, VOIP CS3, Video, Net-Mgmt, Default
+
+policy-map L2-Access-Out
+  class L2-VOIP-Payload-QoSGroup
+  priority level 1
+  police rate percent 33
+  class L2-VOIP-Contol-QoSGroup
+  bandwidth percent 5
+  class L2-Video-Conference-QoSGroup
+  bandwidth percent 15
+  class L2-Net-Mgmt-QoSGroup
+  bandwidth percent 5
+  class class-default
+
+policy-map L2-Access-Trust-In
+  class L2-VOIP-Payload
+    set qos-group 24
+  class L2-VOIP-Control
+    set qos-group 12
+  class L2-Video-Conference
+    set qos-group 18
+  class class-default
+
+policy-map L2-Access-Untrust-In
+  class class-default
+    set dscp default
+  
+
+
+  
+!# apply policy to port channel member ports
+interface Te1/1/1
+  service-policy output L2-Network-Out-PO-Member
+interface Te2/1/1
+  service-policy output L2-Network-Out-PO-Member
+
+
+!# apply policy to access ports/vendor ports/or other ports to trust DSCP
+!int x/x
+!  service-policy input L2-Access-Trust-In
+!  service-policy output L2-Access-Out
+
+
+!# apply policy to untrusted access port
+!#   NOTE:  allows prioritization of traffic out, but doesn't trust in
+!int x/x
+!  service-policy input L2-Access-Untrust-In
+!  service-policy output L2-Access-Out
+#}
+
+
+
+!# Interface Reference
+
+interface range Tw1/0/1 - 36
+ switchport mode access
+! switchport voice vlan {{ item.switch.voip_vlan }}
+ no logging event link-status
+ no snmp trap link-status
+ storm-control broadcast level 1.00
+ spanning-tree portfast
+ ip dhcp snooping limit rate 30
+
+interface range Tw2/0/1 - 36
+ switchport mode access
+! switchport voice vlan {{ item.switch.voip_vlan }}
+ no logging event link-status
+ no snmp trap link-status
+ storm-control broadcast level 1.00
+ spanning-tree portfast
+ ip dhcp snooping limit rate 30
+
+interface range Tw3/0/1 - 36
+ switchport mode access
+! switchport voice vlan {{ item.switch.voip_vlan }}
+ no logging event link-status
+ no snmp trap link-status
+ storm-control broadcast level 1.00
+ spanning-tree portfast
+ ip dhcp snooping limit rate 30
+
+interface range Tw4/0/1 - 36
+ switchport mode access
+! switchport voice vlan {{ item.switch.voip_vlan }}
+ no logging event link-status
+ no snmp trap link-status
+ storm-control broadcast level 1.00
+ spanning-tree portfast
+ ip dhcp snooping limit rate 30
+
+interface range Tw5/0/1 - 36
+ switchport mode access
+! switchport voice vlan {{ item.switch.voip_vlan }}
+ no logging event link-status
+ no snmp trap link-status
+ storm-control broadcast level 1.00
+ spanning-tree portfast
+ ip dhcp snooping limit rate 30
+
+interface range Te1/0/37 - 48
+ description RESERVED FOR AP
+ switchport access vlan  {{ item.switch.wlc_vlan }}
+ switchport mode access
+ no snmp trap link-status
+
+interface range Te2/0/37 - 48
+ description RESERVED FOR AP
+ switchport access vlan  {{ item.switch.wlc_vlan }}
+ switchport mode access
+ no snmp trap link-status
+
+interface range Te3/0/37 - 48
+ description RESERVED FOR AP
+ switchport access vlan  {{ item.switch.wlc_vlan }}
+ switchport mode access
+ no snmp trap link-status
+
+interface range Te4/0/37 - 48
+ description RESERVED FOR AP
+ switchport access vlan  {{ item.switch.wlc_vlan }}
+ switchport mode access
+ no snmp trap link-status
+
+interface range Te5/0/37 - 48
+ description RESERVED FOR AP
+ switchport access vlan  {{ item.switch.wlc_vlan }}
+ switchport mode access
+ no snmp trap link-status
+
+interface range Te1/1/2 - 8
+ shutdown
+
+interface range Te2/1/2 - 8
+ shutdown
+
+
+
+
+

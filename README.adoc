@@ -130,3 +130,19 @@ Add more variables
 
 Add additional playbooks, or adjust to use seperate sub-jinja2 'base' templates per device/function category
 
+== Authors
+Michael Johnson (https://github.com/samualblair[@samualblair])
+
+Additional Acknowledgements:
+
+* Tommy Caswell
+* Nate Helfry
+* Roy Shaver
+
+== Versioning
+Using Calendar Versioning: https://calver.org/
+
+FORMAT: YY.0M.0D
+
+* 2025.01.21 - General release
+* Pre-release development
